@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm  # progress bar
 
 # import module of functions to compute the Fisher Matrix of QNMs
-import fisher_matrix_elements as fme
+import fisher_matrix_elements_two_modes as fme
 from import_data import convert_units, ImportQNMParameters, ImportDetector
 from compute_snr import compute_SRN
 
@@ -22,21 +22,21 @@ def run_all_detectors_two_modes():
                     '(2,2,0)', mode, q, detector)
 
 
-def compute_rayleigh_criterion_all_masses_and_redshifts(mode_1: str, mode_2: str, mass_ratio: float, detector: str, cores=6):
+def compute_rayleigh_criterion_all_masses_and_redshifts(mode_0: str, mode_1: str, mass_ratio: float, detector: str, cores=6):
     """Compute and save the QNMs parameters errors using Fisher Matrix formalism
     for all mass and redshift in the detector range. The singal is assumed to be
     a sum of two QNMs.
 
     Parameters
     ----------
-    mode_1 : str
+    mode_0 : str
         First QNM considered in the signal. Must be {'(2,2,0)',
         (2,2,1) I', '(2,2,1) II', (3,3,0), (4,4,0), (2,1,0)}. Must
-        be different from mode_1.
-    mode_2 : str
+        be different from mode_0.
+    mode_1 : str
         Second QNM considered in the signal. Must be {'(2,2,0)',
         (2,2,1) I', '(2,2,1) II', (3,3,0), (4,4,0), (2,1,0)}. Must
-        be different from mode_1.
+        be different from mode_0.
     mass_ratio : float
         Binary black hole mass ratio. mass_ratio >= 1. This is used to
         determine the QNM parameters.
@@ -72,8 +72,8 @@ def compute_rayleigh_criterion_all_masses_and_redshifts(mode_1: str, mode_2: str
         redshift,
         antenna_plus[detector],
         antenna_cross[detector],
+        mode_0,
         mode_1,
-        mode_2,
         detector,
         mass_ratio,
     )
@@ -85,7 +85,7 @@ def compute_rayleigh_criterion_all_masses_and_redshifts(mode_1: str, mode_2: str
                            tqdm(values, total=len(values)))
 
 
-def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, antenna_plus: float, antenna_cross: float, mode_1: str, mode_2: str, detector: str, mass_ratio: float):
+def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, antenna_plus: float, antenna_cross: float, mode_0: str, mode_1: str, detector: str, mass_ratio: float):
     """Compute and save the QNMs parameters errors using Fisher Matrix formalism.
     The singal is assumed to be a sum of two QNMs.
 
@@ -101,13 +101,13 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
     antenna_cross : float
         Antenna pattern response for the cross polarization, include
         also the spheroidal harmonic value.
-    mode_1 : str
+    mode_0 : str
         First QNM considered in the signal. Must be {'(2,2,0)',
         (2,2,1) I', '(2,2,1) II', (3,3,0), (4,4,0), (2,1,0)}.
-    mode_2 : str
+    mode_1 : str
         Second QNM considered in the signal. Must be {'(2,2,0)',
         (2,2,1) I', '(2,2,1) II', (3,3,0), (4,4,0), (2,1,0)}. Must
-        be different from mode_1.
+        be different from mode_0.
     detector : str
         Gravitational wave detector name. Must be {'LIGO', 'LISA',
         'CE' = 'CE2silicon', 'CE2silica', 'ET'}.
@@ -127,13 +127,27 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
         tau[mode] = time_unit / omega['omega_i']
 
     # Compute difference between modes parameters
-    delta_freq = abs(freq[mode_1] - freq[mode_2])
-    delta_tau = abs(tau[mode_1] - tau[mode_2])
+    delta_freq = abs(freq[mode_0] - freq[mode_1])
+    delta_tau = abs(tau[mode_0] - tau[mode_1])
 
     # Create qnm parameters dictionary
-    qnm_parameters = {}
-    for mode in [mode_1, mode_2]:
-        qnm_parameters[mode] = {
+
+    qnm_parameters = {
+        'freq_array': noise.noise['freq'],
+        'A': qnm_pars.amplitudes[mode_0],
+        'phi_0': qnm_pars.phases[mode_0],
+        'f_0': freq[mode_0],
+        'tau_0': tau[mode_0],
+        'R': qnm_pars.amplitudes[mode_1] / qnm_pars.amplitudes[mode_0],
+        'phi_1': qnm_pars.phases[mode_1],
+        'f_1': freq[mode_1],
+        'tau_1': tau[mode_1],
+    }
+
+    # Create qnm parameters dictionary for SNR
+    qnm_pars_snr = {}
+    for mode in [mode_0, mode_1]:
+        qnm_pars_snr[mode] = {
             'freq_array': noise.noise['freq'],
             'A_lmn': qnm_pars.amplitudes[mode],
             'phi_lmn': qnm_pars.phases[mode],
@@ -142,12 +156,12 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
         }
 
     # Compute Fisher Matrix errors
-    sigma_1, sigma_2 = compute_two_modes_fisher_matrix(
-        strain_unit, antenna_plus, antenna_cross, qnm_parameters[mode_1], qnm_parameters[mode_2], noise.noise)
+    sigma = compute_two_modes_fisher_matrix(
+        strain_unit, antenna_plus, antenna_cross, qnm_parameters, noise.noise)
     snr_1 = compute_SRN(strain_unit, antenna_plus,
-                        antenna_cross, qnm_parameters[mode_1], noise.noise)
+                        antenna_cross, qnm_pars_snr[mode_0], noise.noise)
     snr_2 = compute_SRN(strain_unit, antenna_plus,
-                        antenna_cross, qnm_parameters[mode_2], noise.noise)
+                        antenna_cross, qnm_pars_snr[mode_1], noise.noise)
 
     # find src folder path
     src_path = str(Path(__file__).parent.absolute())
@@ -159,44 +173,46 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
     Path(data_path + '/rayleigh_criterion').mkdir(parents=True, exist_ok=True)
 
     # save everything
-    file_all_errors = f'{data_path}/all_errors/{detector}_q_{mass_ratio}_mode1_{mode_1[1]+mode_1[3]+mode_1[5]}_mode2_{mode_2[1]+mode_2[3]+mode_2[5]}_all_errors.dat'
+    file_all_errors = f'{data_path}/all_errors/{detector}_q_{mass_ratio}_all_errors.dat'
     if not Path(file_all_errors).is_file():
         with open(file_all_errors, 'w') as file:
-            file.write(
-                f'#(0)mass(1)redshift(2)freq-{mode_1}(3)freq-{mode_2}(4)tau-{mode_1}(5)tau-{mode_2}')
-            file.write(f'(6)SNR-{mode_1}(7)SNR-{mode_2}')
-            file.write(
-                f'(8)error_A-{mode_1}(9)error_phi-{mode_1}(10)error_f-{mode_1}(11)error_tau-{mode_1}')
-            file.write(
-                f'(12)error_A-{mode_2}(13)error_phi-{mode_2}(14)error_f-{mode_2}(15)error_tau-{mode_2}\n')
+            file.write('#(0)mass(1)redshift(2)mode_0(3)mode_1')
+            file.write('(4)freq_mode_0(5)freq_mode_1(6)tau_mode_0(7)tau_mode_0')
+            file.write('(8)SNR_mode_0(9)SNR_mode_1')
+            file.write('(10)error_A(11)error_phi_mode_0')
+            file.write('(12)error_f_mode_0(13)error_tau_mode_0')
+            file.write('(14)error_R(15)error_phi_mode_1')
+            file.write('(16)error_f_mode_1(17)error_tau_mode_1\n')
     with open(file_all_errors, 'a') as file:
-        file.write(
-            f'{final_mass}\t{redshift}\t{freq[mode_1]}\t{freq[mode_2]}\t{tau[mode_1]}\t{tau[mode_2]}\t')
+        file.write(f'{final_mass}\t{redshift}\t{mode_0}\t{mode_1}\t')
+        file.write(f'{freq[mode_0]}\t{freq[mode_1]}\t')
+        file.write(f'{tau[mode_0]}\t{tau[mode_1]}\t')
         file.write(f'{snr_1}\t{snr_2}\t')
-        file.write(
-            f"{sigma_1['A_lmn']}\t{sigma_1['phi_lmn']}\t{sigma_1['f_lmn']}\t{sigma_1['tau_lmn']}\t")
-        file.write(
-            f"{sigma_2['A_lmn']}\t{sigma_2['phi_lmn']}\t{sigma_2['f_lmn']}\t{sigma_2['tau_lmn']}\n")
+        file.write(f"{sigma['A']}\t{sigma['phi_0']}\t")
+        file.write(f"{sigma['f_0']}\t{sigma['tau_0']}\t")
+        file.write(f"{sigma['R']}\t{sigma['phi_1']}\t")
+        file.write(f"{sigma['f_1']}\t{sigma['tau_1']}\n")
 
     # save rayleigh criterion
-    file_rayleigh_criterion = f'{data_path}/rayleigh_criterion/{detector}_q_{mass_ratio}_mode1_{mode_1[1]+mode_1[3]+mode_1[5]}_mode2_{mode_2[1]+mode_2[3]+mode_2[5]}_rayleigh_criterion.dat'
+    file_rayleigh_criterion = f'{data_path}/rayleigh_criterion/{detector}_q_{mass_ratio}_rayleigh_criterion.dat'
     if not Path(file_rayleigh_criterion).is_file():
         with open(file_rayleigh_criterion, 'w') as file:
-            file.write(f'#(0)mass(1)redshift(2)delta_freq(3)max(sigma_freq)')
-            file.write(
-                f'(4)delta_tau(5)max(sigma_tau)(6)SNR-{mode_1}(7)SNR-{mode_2}\n')
+            file.write(f'#(0)mass(1)redshift(2)mode_0(3)mode_1')
+            file.write(f'(4)delta_freq(5)sigma_freq_mode_0(6)sigma_freq_mode_1')
+            file.write(f'(7)delta_tau(8)sigma_tau_mode_0(9)sigma_tau_mode_1')
+            file.write(f'(6)SNR_mode_0(7)SNRmode_1\n')
     with open(file_rayleigh_criterion, 'a') as file:
-        file.write(f'{final_mass}\t{redshift}\t')
+        file.write(f'{final_mass}\t{redshift}\t{mode_0}\t{mode_1}\t')
         file.write(f"{delta_freq}\t")
-        file.write(f"{max(sigma_1['f_lmn'], sigma_2['f_lmn'])}\t")
+        file.write(f"{sigma['f_0']}\t{sigma['f_1']}\t")
         file.write(f'{delta_tau}\t')
-        file.write(f"{max(sigma_1['tau_lmn'], sigma_2['tau_lmn'])}\t")
+        file.write(f"{sigma['tau_0']}\t{sigma['tau_1']}\t")
         file.write(f'{snr_1}\t{snr_2}\n')
 
     return 0
 
 
-def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float, antenna_cross: float, qnm_pars_1: dict, qnm_pars_2: dict, noise: dict):
+def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float, antenna_cross: float, qnm_pars: dict, noise: dict):
     """Compute the QNM parameter errors of a signal containing
     two QNMs using Fisher Matrix formalism.
 
@@ -210,18 +226,16 @@ def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float
     antenna_cross : float
         Antenna pattern response for the coss polarization, include
         also the spheroidal harmonic value.
-    qnm_pars_1 : dict
-        Dictionary with the QNM parameters of the first mode:
-            'A_lmn': amplitude
-            'phi_lmn': phase
-            'f_lmn': frequency
-            'tau_lmn': decay time
-    qnm_pars_2 : dict
-        Dictionary with the QNM parameters of the second mode:
-            'A_lmn': amplitude
-            'phi_lmn': phase
-            'f_lmn': frequency
-            'tau_lmn': decay time
+    qnm_pars : dict
+        Dictionary with the QNM parameters of the both modes:
+            'A': global amplitude
+            'phi_0': 1st mode phase
+            'f_0': 1st mode frequency
+            'tau_0': 1st mode decay time
+            'R': amplitude ratio
+            'phi_1': 2nd mode phase
+            'f_1': 2nd mode frequency
+            'tau_1': 2nd mode decay time
     noise : dict
         Dictionary containing:
             'freq': noise frequency sampling
@@ -230,51 +244,36 @@ def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float
 
     Returns
     -------
-    dict, dict
-        Returns sigma_1, sigma_2 containing the estimated errors for modes 1 and 2,
-        respectively, of the same parameters
-            'A_lmn': amplitude
-            'phi_lmn': phase
-            'f_lmn': frequency
-            'tau_lmn': decay time
+    dict
+        Returns sigma containing the estimated errors for both modes
+        parameters
+            'A': global amplitude
+            'phi_0': 1st mode phase
+            'f_0': 1st mode frequency
+            'tau_0': 1st mode decay time
+            'R': amplitude ratio
+            'phi_1': 2nd mode phase
+            'f_1': 2nd mode frequency
+            'tau_1': 2nd mode decay time
     """
     # convert noise to numpy arrays
     noise['freq'] = np.asanyarray(noise['freq'])
     noise['psd'] = np.asanyarray(noise['psd'])
-
+    qnm_pars['freq_array'] = noise['freq']
     # create a 8x8 matrix filled with zeros
     fisher_matrix = np.zeros([8, 8])
 
     # sort the parameters to compute the Fisher Matrix
     parameters_list = [
-        'A_lmn',
-        'phi_lmn',
-        'f_lmn',
-        'tau_lmn',
-        'A_lmn',
-        'phi_lmn',
-        'f_lmn',
-        'tau_lmn',
+        'A',
+        'phi_0',
+        'f_0',
+        'tau_0',
+        'R',
+        'phi_1',
+        'f_1',
+        'tau_1',
     ]
-
-    # create fisher matrix elements functions argument dictionaries
-    qnm_parameters_dict = {}
-    for i in range(0, 4):
-        qnm_parameters_dict[i] = {
-            'freq_array': noise['freq'],
-            'A_lmn': qnm_pars_1['A_lmn'],
-            'phi_lmn': qnm_pars_1['phi_lmn'],
-            'f_lmn': qnm_pars_1['f_lmn'],
-            'tau_lmn': qnm_pars_1['tau_lmn'],
-        }
-    for i in range(4, 8):
-        qnm_parameters_dict[i] = {
-            'freq_array': noise['freq'],
-            'A_lmn': qnm_pars_2['A_lmn'],
-            'phi_lmn': qnm_pars_2['phi_lmn'],
-            'f_lmn': qnm_pars_2['f_lmn'],
-            'tau_lmn': qnm_pars_2['tau_lmn'],
-        }
 
     for i in range(0, 8):
         for j in range(0, 8):
@@ -282,13 +281,13 @@ def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float
                                                     global_amplitude * (
                 antenna_plus *
                 (fme.choose_polarization_and_parameter(
-                    'real', parameters_list[i])(qnm_parameters_dict[i]))
-                + antenna_cross * (fme.choose_polarization_and_parameter('imag', parameters_list[i])(qnm_parameters_dict[i]))),
+                    'real', parameters_list[i])(qnm_pars))
+                + antenna_cross * (fme.choose_polarization_and_parameter('imag', parameters_list[i])(qnm_pars))),
                 global_amplitude * (
                     antenna_plus *
                 (fme.choose_polarization_and_parameter(
-                    'real', parameters_list[j])(qnm_parameters_dict[j]))
-                    + antenna_cross * (fme.choose_polarization_and_parameter('imag', parameters_list[j])(qnm_parameters_dict[j]))),
+                    'real', parameters_list[j])(qnm_pars))
+                    + antenna_cross * (fme.choose_polarization_and_parameter('imag', parameters_list[j])(qnm_pars))),
                 noise['psd']
             )
 
@@ -298,18 +297,15 @@ def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float
     else:
         correlation_matrix = np.linalg.inv(fisher_matrix)
 
-    sigma_1 = {
-        'A_lmn':    np.sqrt(np.abs(correlation_matrix[0, 0])),
-        'phi_lmn':  np.sqrt(np.abs(correlation_matrix[1, 1])),
-        'f_lmn':    np.sqrt(np.abs(correlation_matrix[2, 2])),
-        'tau_lmn':  np.sqrt(np.abs(correlation_matrix[3, 3])),
+    sigma = {
+        'A':    np.sqrt(np.abs(correlation_matrix[0, 0])),
+        'phi_0':  np.sqrt(np.abs(correlation_matrix[1, 1])),
+        'f_0':    np.sqrt(np.abs(correlation_matrix[2, 2])),
+        'tau_0':  np.sqrt(np.abs(correlation_matrix[3, 3])),
+        'R':    np.sqrt(np.abs(correlation_matrix[4, 4])),
+        'phi_1':  np.sqrt(np.abs(correlation_matrix[5, 5])),
+        'f_1':    np.sqrt(np.abs(correlation_matrix[6, 6])),
+        'tau_1':  np.sqrt(np.abs(correlation_matrix[7, 7])),
     }
 
-    sigma_2 = {
-        'A_lmn':    np.sqrt(np.abs(correlation_matrix[4, 4])),
-        'phi_lmn':  np.sqrt(np.abs(correlation_matrix[5, 5])),
-        'f_lmn':    np.sqrt(np.abs(correlation_matrix[6, 6])),
-        'tau_lmn':  np.sqrt(np.abs(correlation_matrix[7, 7])),
-    }
-
-    return sigma_1, sigma_2
+    return sigma
