@@ -55,7 +55,7 @@ def compute_rayleigh_criterion_all_masses_and_redshifts(mode_0: str, mode_1: str
         'LISA': np.logspace(start=4, stop=9, num=int(N_points * 5.0), base=10),
     }
     redshifts = {
-        'LIGO': np.logspace(start=-3.05, stop=0, num=int(N_points * 2), base=10),
+        'LIGO': np.logspace(start=-2.05, stop=0, num=int(N_points * 2), base=10),
         'CE':   np.logspace(start=-2.05, stop=1.05, num=int(N_points * 3), base=10),
         'ET':   np.logspace(start=-2.05, stop=1.05, num=int(N_points * 3), base=10),
         'LISA': np.logspace(start=-2.05, stop=1.05, num=int(N_points * 5), base=10),
