@@ -152,85 +152,6 @@ def save_errors_A_R(final_mass: float, redshift: float, freq, tau, mode_0, mode_
     return 0
 
 
-def run_single_event(final_mass, redshift, mode_1):
-    mode_0 = '(2,2,0)'
-    qs = [1.5, 10]
-
-    antenna_plus = np.sqrt(1 / 5 / 4 / np.pi)
-    antenna_cross = antenna_plus
-    for mass_ratio in qs:
-        print(mass_ratio)
-        compute_errors_single_case(
-            final_mass, redshift, antenna_plus, antenna_cross, mode_0, mode_1, 'LIGO', mass_ratio)
-
-
-def compute_errors_single_case(final_mass: float, redshift: float, antenna_plus: float, antenna_cross: float, mode_0: str, mode_1: str, detector: str, mass_ratio: float):
-    """Compute and save the QNMs parameters errors using Fisher Matrix formalism.
-    The singal is assumed to be a sum of two QNMs.
-
-    Parameters
-    ----------
-    final_mass : float
-        Mass of the remmnant black hole
-    redshift : float
-        Cosmological redshift of the source
-    antenna_plus : float
-        Antenna pattern response for the plus polarization, include
-        also the spheroidal harmonic value.
-    antenna_cross : float
-        Antenna pattern response for the cross polarization, include
-        also the spheroidal harmonic value.
-    mode_0 : str
-        First QNM considered in the signal. Must be {'(2,2,0)',
-        (2,2,1) I', '(2,2,1) II', (3,3,0), (4,4,0), (2,1,0)}.
-    mode_1 : str
-        Second QNM considered in the signal. Must be {'(2,2,0)',
-        (2,2,1) I', '(2,2,1) II', (3,3,0), (4,4,0), (2,1,0)}. Must
-        be different from mode_0.
-    detector : str
-        Gravitational wave detector name. Must be {'LIGO', 'LISA',
-        'CE' = 'CE2silicon', 'CE2silica', 'ET'}.
-    mass_ratio : float
-        Binary black hole mass ratio. mass_ratio >= 1. This is used to
-        determine the QNM parameters.
-    """
-    noise = ImportDetector(detector)
-    qnm_pars = ImportQNMParameters(mass_ratio)
-    time_unit, strain_unit = convert_units(
-        final_mass, redshift, qnm_pars.bh_pars['remnant_mass'])
-
-    # Compute QNM frequency and damping time according to the source
-    freq, tau = {}, {}
-    for (mode, omega) in qnm_pars.omegas.items():
-        freq[mode] = omega['omega_r'] / 2 / np.pi / time_unit
-        tau[mode] = time_unit / omega['omega_i']
-
-    delta_tau = abs(tau[mode_0] - tau[mode_1])
-
-    # Create qnm parameters dictionary
-
-    qnm_parameters = {
-        'freq_array': noise.noise['freq'],
-        'A': qnm_pars.amplitudes[mode_0],
-        'phi_0': qnm_pars.phases[mode_0],
-        'f_0': freq[mode_0],
-        'tau_0': tau[mode_0],
-        'R': qnm_pars.amplitudes[mode_1] / qnm_pars.amplitudes[mode_0],
-        'phi_1': qnm_pars.phases[mode_1],
-        'f_1': freq[mode_1],
-        'tau_1': tau[mode_1],
-    }
-
-    # Compute Fisher Matrix errors
-    sigma = compute_two_modes_fisher_matrix(
-        strain_unit, antenna_plus, antenna_cross, qnm_parameters, noise.noise)
-    print('f_0: ', freq[mode_0])
-    print('tau_0: ', tau[mode_0])
-    print('f_1: ', freq[mode_1])
-    print('tau_1: ', tau[mode_1])
-    print(sigma)
-
-
 def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float, antenna_cross: float, qnm_pars: dict, noise: dict):
     """Compute the QNM parameter errors of a signal containing
     two QNMs using Fisher Matrix formalism.
@@ -331,26 +252,4 @@ def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float
 
 
 if __name__ == '__main__':
-    # run_all_detectors_two_modes()
-    # GW190521
-    # M_f = 156.3 e z = 0.64
-    # GW150914
-    # M_f = 63.1 e z = 0.09
-
-    events = {
-        'GW150914': {
-            'final_mass': 63.1,
-            'redshift': 0.09,
-            'redshift': 0.02,
-            'redshift': 0.02 * 0.5,
-        },
-        'GW190521': {
-            'final_mass': 156.3,
-            'redshift': 0.64,
-            'redshift': 0.06,
-            'redshift': 0.06 * 0.5,
-        },
-    }
-    for event, value in events.items():
-        print(event)
-        run_single_event(value['final_mass'], value['redshift'], '(2,2,1) II')
+    run_all_detectors_two_modes()
