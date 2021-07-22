@@ -29,18 +29,35 @@ def compute_SRN(global_amplitude: float, antenna_plus: float, antenna_cross: flo
     noise['freq'] = np.asanyarray(noise['freq'])
     noise['psd'] = np.asanyarray(noise['psd'])
 
-    return inner_product(noise['freq'],
-                         global_amplitude *
-                         (antenna_plus * h_real(qnm_pars) +
-                          antenna_cross * h_imag(qnm_pars)),
-                         global_amplitude *
-                         (antenna_plus * h_real(qnm_pars) +
-                          antenna_cross * h_imag(qnm_pars)),
-                         noise['psd']
-                         )
+    return np.sqrt(inner_product(noise['freq'],
+                                 global_amplitude *
+                                 (antenna_plus * h_real(qnm_pars) +
+                                  antenna_cross * h_imag(qnm_pars)),
+                                 global_amplitude *
+                                 (antenna_plus * h_real(qnm_pars) +
+                                  antenna_cross * h_imag(qnm_pars)),
+                                 noise['psd']
+                                 ))
 
+
+def compute_SRN_2modes(global_amplitude: float, antenna_plus: float, antenna_cross: float, qnm_pars_0: dict, qnm_pars_1: dict, noise: dict):
+    # convert noise to numpy arrays
+    noise['freq'] = np.asanyarray(noise['freq'])
+    noise['psd'] = np.asanyarray(noise['psd'])
+
+    return np.sqrt(inner_product(noise['freq'],
+                                 global_amplitude *
+                                 (antenna_plus * (h_real(qnm_pars_0) + h_real(qnm_pars_1)) +
+                                  antenna_cross * (h_imag(qnm_pars_0) + h_imag(qnm_pars_1))),
+                                 global_amplitude *
+                                 (antenna_plus * (h_real(qnm_pars_0) + h_real(qnm_pars_1)) +
+                                  antenna_cross * (h_imag(qnm_pars_0) + h_imag(qnm_pars_1))),
+                                 noise['psd']
+                                 ))
 
 # define b_\pm
+
+
 def b_p(freq_array: list, f_lmn: float, tau_lmn: float):
     """Fourier transform of the only the part that contains
     a time dependence of a QNM. b_plus defined in the docstring

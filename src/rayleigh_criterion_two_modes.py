@@ -8,7 +8,7 @@ from tqdm import tqdm  # progress bar
 # import module of functions to compute the Fisher Matrix of QNMs
 import fisher_matrix_elements_two_modes as fme
 from import_data import convert_units, ImportQNMParameters, ImportDetector
-from compute_snr import compute_SRN
+from compute_snr import compute_SRN, compute_SRN_2modes
 
 
 def run_all_detectors_two_modes():
@@ -18,6 +18,19 @@ def run_all_detectors_two_modes():
     for q in qs:
         for detector in detectors:
             for comb in list(combinations(modes, 2)):
+                print(q, detector, comb)
+                compute_rayleigh_criterion_all_masses_and_redshifts(
+                    comb[0], comb[1], q, detector)
+
+
+def run_all_detectors_two_modes_fundamental():
+    detectors = ['LIGO', 'LISA', 'CE', 'ET']
+    modes = ['(2,2,1) II', '(3,3,0)', '(4,4,0)', '(2,1,0)']
+    qs = [1.5, 10]
+    for q in qs:
+        for detector in detectors:
+            for mode in modes:
+                comb = ['(2,2,0)'] + [mode]
                 print(q, detector, comb)
                 compute_rayleigh_criterion_all_masses_and_redshifts(
                     comb[0], comb[1], q, detector)
@@ -55,7 +68,7 @@ def compute_rayleigh_criterion_all_masses_and_redshifts(mode_0: str, mode_1: str
         'LISA': np.logspace(start=4, stop=9, num=int(N_points * 5.0), base=10),
     }
     redshifts = {
-        'LIGO': np.logspace(start=-3.05, stop=0, num=int(N_points * 2), base=10),
+        'LIGO': np.logspace(start=-4.05, stop=0, num=int(N_points * 4), base=10),
         'CE':   np.logspace(start=-2.05, stop=1.05, num=int(N_points * 3), base=10),
         'ET':   np.logspace(start=-2.05, stop=1.05, num=int(N_points * 3), base=10),
         'LISA': np.logspace(start=-2.05, stop=1.05, num=int(N_points * 5), base=10),
@@ -163,6 +176,8 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
                         antenna_cross, qnm_pars_snr[mode_0], noise.noise)
     snr_2 = compute_SRN(strain_unit, antenna_plus,
                         antenna_cross, qnm_pars_snr[mode_1], noise.noise)
+    snr_both = compute_SRN_2modes(strain_unit, antenna_plus, antenna_cross,
+                                  qnm_pars_snr[mode_0], qnm_pars_snr[mode_1], noise.noise)
 
     # find src folder path
     src_path = str(Path(__file__).parent.absolute())
@@ -183,7 +198,8 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
             file.write('(10)error_A(11)error_phi_mode_0')
             file.write('(12)error_f_mode_0(13)error_tau_mode_0')
             file.write('(14)error_R(15)error_phi_mode_1')
-            file.write('(16)error_f_mode_1(17)error_tau_mode_1\n')
+            file.write('(16)error_f_mode_1(17)error_tau_mode_1')
+            file.write('(18)SNR_ringdown\n')
     with open(file_all_errors, 'a') as file:
         file.write(f'{final_mass}\t{redshift}\t"{mode_0}"\t"{mode_1}"\t')
         file.write(f'{freq[mode_0]}\t{freq[mode_1]}\t')
@@ -192,7 +208,8 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
         file.write(f"{sigma['A']}\t{sigma['phi_0']}\t")
         file.write(f"{sigma['f_0']}\t{sigma['tau_0']}\t")
         file.write(f"{sigma['R']}\t{sigma['phi_1']}\t")
-        file.write(f"{sigma['f_1']}\t{sigma['tau_1']}\n")
+        file.write(f"{sigma['f_1']}\t{sigma['tau_1']}\t")
+        file.write(f"{snr_both}\n")
 
     # save rayleigh criterion
     file_rayleigh_criterion = f'{data_path}/rayleigh_criterion/{detector}_q_{mass_ratio}_rayleigh_criterion.dat'
@@ -201,14 +218,14 @@ def compute_two_modes_rayleigh_criterion(final_mass: float, redshift: float, ant
             file.write(f'#(0)mass(1)redshift(2)mode_0(3)mode_1')
             file.write(f'(4)delta_freq(5)sigma_freq_mode_0(6)sigma_freq_mode_1')
             file.write(f'(7)delta_tau(8)sigma_tau_mode_0(9)sigma_tau_mode_1')
-            file.write(f'(6)SNR_mode_0(7)SNRmode_1\n')
+            file.write(f'(6)SNR_mode_0(7)SNRmode_1(8)SNR_ringdown\n')
     with open(file_rayleigh_criterion, 'a') as file:
         file.write(f'{final_mass}\t{redshift}\t"{mode_0}"\t"{mode_1}"\t')
         file.write(f"{delta_freq}\t")
         file.write(f"{sigma['f_0']}\t{sigma['f_1']}\t")
         file.write(f'{delta_tau}\t')
         file.write(f"{sigma['tau_0']}\t{sigma['tau_1']}\t")
-        file.write(f'{snr_1}\t{snr_2}\n')
+        file.write(f'{snr_1}\t{snr_2}\t{snr_both}\n')
 
     return 0
 
@@ -313,4 +330,4 @@ def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float
 
 
 if __name__ == '__main__':
-    run_all_detectors_two_modes()
+    run_all_detectors_two_modes_fundamental()
