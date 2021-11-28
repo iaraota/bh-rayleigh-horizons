@@ -224,11 +224,17 @@ def compute_errors_single_case(final_mass: float, redshift: float, antenna_plus:
     # Compute Fisher Matrix errors
     sigma = compute_two_modes_fisher_matrix(
         strain_unit, antenna_plus, antenna_cross, qnm_parameters, noise.noise)
-    print('f_0: ', freq[mode_0])
-    print('tau_0: ', tau[mode_0])
-    print('f_1: ', freq[mode_1])
-    print('tau_1: ', tau[mode_1])
-    print(sigma)
+
+    print('A_0',  qnm_pars.amplitudes[mode_0] * strain_unit)
+    print('sigma_A_0',  sigma['A'] * strain_unit)
+    # print('f_0: ', freq[mode_0])
+    # print('tau_0: ', tau[mode_0])
+    # print('f_1: ', freq[mode_1])
+    # print('tau_1: ', tau[mode_1])
+    print('parameters: \n', qnm_parameters)
+    print('sigma:\n', sigma)
+
+    return sigma, qnm_parameters
 
 
 def compute_two_modes_fisher_matrix(global_amplitude: float, antenna_plus: float, antenna_cross: float, qnm_pars: dict, noise: dict):
@@ -340,14 +346,14 @@ if __name__ == '__main__':
     events = {
         'GW150914': {
             'final_mass': 63.1,
-            'redshift': 0.09,
-            'redshift': 0.02,
+            # 'redshift': 0.09,
+            # 'redshift': 0.02,
             'redshift': 0.02 * 0.5,
         },
         'GW190521': {
             'final_mass': 156.3,
-            'redshift': 0.64,
-            'redshift': 0.06,
+            # 'redshift': 0.64,
+            # 'redshift': 0.06,
             'redshift': 0.06 * 0.5,
         },
     }

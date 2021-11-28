@@ -24,9 +24,9 @@ def run_all_detectors_two_modes():
 
 
 def run_all_detectors_two_modes_fundamental():
-    detectors = ['LIGO', 'LISA', 'CE', 'ET']
-    modes = ['(2,2,1) II', '(3,3,0)', '(4,4,0)', '(2,1,0)']
-    qs = [1.5, 10]
+    detectors = ['LISA']#['LIGO', 'LISA', 'CE', 'ET']
+    modes = ['(2,2,1) II']#, '(3,3,0)', '(4,4,0)', '(2,1,0)']
+    qs = [1.5]#, 10]
     for q in qs:
         for detector in detectors:
             for mode in modes:
@@ -71,7 +71,7 @@ def compute_rayleigh_criterion_all_masses_and_redshifts(mode_0: str, mode_1: str
         'LIGO': np.logspace(start=-4.05, stop=0, num=int(N_points * 4), base=10),
         'CE':   np.logspace(start=-2.05, stop=1.05, num=int(N_points * 3), base=10),
         'ET':   np.logspace(start=-2.05, stop=1.05, num=int(N_points * 3), base=10),
-        'LISA': np.logspace(start=-2.05, stop=1.05, num=int(N_points * 5), base=10),
+        'LISA': np.logspace(start=-2.05, stop=2.05, num=int(N_points * 5), base=10),
     }
     # angle average of antenna patter response times angle average of spheroidal harmonics
     antenna_plus = {
